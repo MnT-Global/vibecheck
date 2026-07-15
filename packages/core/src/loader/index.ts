@@ -100,6 +100,16 @@ async function* walkDir(
 
 /** Build the ScanContext: all I/O (walk, read, parse) happens here, once, up front. */
 export async function buildContext(root: string, options: ScanOptions = {}): Promise<ScanContext> {
+  // A nonexistent or non-directory root must fail LOUDLY. Otherwise the walk yields zero files,
+  // zero findings score a perfect 100, and vibecheck reports "A+" for a path that was never
+  // scanned — a dangerous false "all clear". (This is the #1 misuse: passing a URL or a typo'd
+  // path.) Validate up front and throw a clear error the CLI can surface.
+  const rootStat = await stat(root).catch(() => null);
+  if (!rootStat) throw new Error(`path not found: ${root}`);
+  if (!rootStat.isDirectory()) {
+    throw new Error(`not a directory: ${root} — point vibecheck at a project folder`);
+  }
+
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
   const maxBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
   const ig = await loadIgnorer(root);

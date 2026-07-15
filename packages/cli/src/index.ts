@@ -46,6 +46,12 @@ function flagValue(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+/** Did the user pass a remote repo URL (or a `./`-prefixed one) instead of a local folder? */
+function looksLikeRemote(s: string): boolean {
+  const t = s.replace(/^\.?\/+/, ""); // strip a leading ./ or /
+  return /^(https?|git|ssh):\/\//i.test(t) || /^git@/i.test(t) || t.endsWith(".git");
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
@@ -65,6 +71,22 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // A URL/.git target means they want to scan a remote repo. vibecheck scans a LOCAL folder, so
+  // rather than silently treating the URL as a (missing) path and reporting a bogus "A+", tell
+  // them how to actually do it.
+  if (looksLikeRemote(target)) {
+    const url = target.replace(/^\.?\/+/, "");
+    console.error(
+      `error: vibecheck scans a local folder, not a remote URL.
+
+  Clone the repo first, then scan the folder:
+    git clone ${url}
+    npx @mntglobal/vibecheck <folder>
+`,
+    );
+    process.exit(1);
+  }
+
   // A file argument for a flag: the next token, unless it's another flag or the scan path.
   const fileFor = (name: string): string | undefined => {
     const v = flagValue(args, name);
@@ -75,6 +97,18 @@ async function main(): Promise<void> {
     experimental: args.includes("--experimental"),
     offline: args.includes("--offline"),
   });
+
+  // A folder with no scannable source is NOT a clean bill of health — never present it as a grade.
+  if (report.filesScanned === 0) {
+    console.error(
+      `error: no scannable files found in ${resolve(target)}
+
+  vibecheck reads .js / .jsx / .ts / .tsx / .json / .env source. Make sure the path
+  points at your project root (not an empty, wrong, or already-built folder).
+`,
+    );
+    process.exit(1);
+  }
 
   // Renderers by format. Each of --json/--sarif/--md may write to a file (any number in one
   // run) or, without a file arg, print to stdout (at most one stdout format).
