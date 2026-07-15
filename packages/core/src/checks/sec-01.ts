@@ -23,16 +23,6 @@ const PATTERNS: Pattern[] = [
   { name: "AWS access key ID", re: /(?:AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}/, severity: "critical" },
   { name: "Shopify access token", re: /shp(?:at|ca|pa)_[a-fA-F0-9]{32}/, severity: "critical" },
   {
-    name: "Private key block",
-    re: /-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----/,
-    severity: "critical",
-  },
-  {
-    name: "Database URI with credentials",
-    re: /(?:postgres(?:ql)?|mongodb(?:\+srv)?|mysql|redis):\/\/[^:@\s/]+:[^@\s/]+@/,
-    severity: "critical",
-  },
-  {
     name: "OpenAI API key",
     re: /sk-[A-Za-z0-9_-]{20,}T3BlbkFJ[A-Za-z0-9_-]{20,}/,
     severity: "high",

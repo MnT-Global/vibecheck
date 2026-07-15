@@ -14,10 +14,10 @@ export const CATEGORY_MAX: Record<Category, number> = {
 
 /** Points deducted per finding, by severity. `info` never affects the score. */
 const SEVERITY_DEDUCTION: Record<Severity, number> = {
-  critical: 10,
-  high: 6,
-  medium: 3,
-  low: 1,
+  critical: 25,
+  high: 12,
+  medium: 6,
+  low: 2,
   info: 0,
 };
 
@@ -38,32 +38,35 @@ export function gradeFor(score: number): Grade {
 }
 
 /**
- * Score with a stack-neutral denominator: only categories actually assessed (a check ran
- * and applied) count toward the total. Un-shipped / N/A categories are simply absent.
+ * Score out of a fixed 100: start at 100, deduct per finding (by severity), where each category
+ * can subtract at most its weight (`CATEGORY_MAX`). Inherently stack-neutral — a category with no
+ * applicable check simply has no findings and deducts nothing, so absence is never penalized, and
+ * finding *more* issues can never raise the score. `assessed` is carried only for reporting which
+ * checks actually ran.
  */
 export function score(
   findings: Finding[],
   assessed: ReadonlySet<Category>,
 ): { score: number; grade: Grade; categoryScores: CategoryScore[] } {
   const categoryScores: CategoryScore[] = [];
-  let earnedTotal = 0;
-  let maxTotal = 0;
+  let totalDeduction = 0;
 
   for (const category of Object.keys(CATEGORY_MAX) as Category[]) {
-    const applicable = assessed.has(category);
     const max = CATEGORY_MAX[category];
     const catFindings = findings.filter((f) => f.category === category);
-    const deducted = catFindings.reduce((sum, f) => sum + SEVERITY_DEDUCTION[f.severity], 0);
-    const earned = Math.max(0, max - deducted);
+    const raw = catFindings.reduce((sum, f) => sum + SEVERITY_DEDUCTION[f.severity], 0);
+    const capped = Math.min(raw, max);
+    totalDeduction += capped;
 
-    categoryScores.push({ category, applicable, max, earned, findings: catFindings.length });
-
-    if (applicable) {
-      earnedTotal += earned;
-      maxTotal += max;
-    }
+    categoryScores.push({
+      category,
+      applicable: assessed.has(category),
+      max,
+      earned: max - capped,
+      findings: catFindings.length,
+    });
   }
 
-  const pct = maxTotal === 0 ? 100 : Math.round((earnedTotal / maxTotal) * 100);
+  const pct = Math.max(0, 100 - totalDeduction);
   return { score: pct, grade: gradeFor(pct), categoryScores };
 }

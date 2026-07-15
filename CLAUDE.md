@@ -40,7 +40,13 @@ Detection specs: `docs/rules.md`. CTO review (decisions): `docs/cto-review-r0.md
 ## Anchor fixtures (the regression gate)
 - `fixtures/lab-before` (vendored from ai-cleanup-lab/before) → must light up findings → low grade.
 - `fixtures/lab-after`  (vendored from ai-cleanup-lab/after)  → must score near-clean (A/B).
-  Current: lab-before **D 50**, lab-after **A+ 100**. If lab-after regresses, CI fails.
+  Current: lab-before **F 40** (7 findings), lab-after **A+ 100** (clean). If lab-after regresses, CI fails.
+
+## Shipped checks (structural tier, on by default)
+SEC-01 (provider secrets) · SEC-04 (private keys / DB URIs) · INJ-01 (eval/new Function) ·
+PERF-01 (sync I/O on hot path) · PROD-03 (error leak) · COM-02 (unvalidated quantity — the
+commerce flagship) · DEP-03 (no tests, info). Next: SEC-02/03, AUTH-03/04, WEB-01(JSX), then the
+flow tier behind `--experimental`.
 
 ## Gotchas
 - Block comments: never put `**/` inside a `/** ... */` JSDoc (it closes the comment early).

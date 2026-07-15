@@ -20,3 +20,11 @@ export function isPlaceholderSecret(value: string): boolean {
 export function lineAt(text: string, row: number): string {
   return text.split("\n")[row] ?? "";
 }
+
+/** Coarse signal that a file runs an HTTP server (used to scope server-only checks). */
+const SERVER_SIGNAL =
+  /\b(?:http|https)\.createServer\b|\bcreateServer\s*\(|\bexpress\s*\(|\bnew\s+Koa\b|\bnew\s+Hono\b|\bfastify\s*\(|\.listen\s*\(|from\s+["']express["']|require\(["']express["']\)/;
+
+export function looksServerSide(text: string): boolean {
+  return SERVER_SIGNAL.test(text);
+}
