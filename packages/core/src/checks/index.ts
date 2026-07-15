@@ -4,12 +4,16 @@ import { auth03 } from "./auth-03.js";
 import { auth04 } from "./auth-04.js";
 import { com01 } from "./com-01.js";
 import { com02 } from "./com-02.js";
+import { com04 } from "./com-04.js";
+import { dep02 } from "./dep-02.js";
 import { dep03 } from "./dep-03.js";
 import { inj01 } from "./inj-01.js";
 import { inj02 } from "./inj-02.js";
 import { inj03 } from "./inj-03.js";
+import { inj04 } from "./inj-04.js";
 import { perf01 } from "./perf-01.js";
 import { perf02 } from "./perf-02.js";
+import { perf03 } from "./perf-03.js";
 import { prod01 } from "./prod-01.js";
 import { prod03 } from "./prod-03.js";
 import { prod04 } from "./prod-04.js";
@@ -40,12 +44,16 @@ export const ALL_CHECKS: Check[] = [
   // flow tier (--experimental)
   auth01,
   com01,
+  com04,
   inj02,
+  inj04,
   web02,
   web03,
   perf02,
+  perf03,
   prod01,
   prod04,
+  dep02,
 ];
 
 /** Checks active for this scan: structural always, flow only under --experimental (ADR-001). */

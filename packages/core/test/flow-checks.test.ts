@@ -37,6 +37,25 @@ describe("flow tier — gated behind --experimental", () => {
   });
 });
 
+describe("flow tier batch 3 — COM-04, PERF-03, INJ-04, DEP-02", () => {
+  it("flags all four on flow2-dirty under --experimental", async () => {
+    const r = await scan(join(fx, "flow2-dirty"), EXP);
+    const found = ids(r.findings);
+    expect(found.has("COM-04")).toBe(true); // client discount
+    expect(found.has("PERF-03")).toBe(true); // N+1 query in loop
+    expect(found.has("INJ-04")).toBe(true); // prototype pollution
+    expect(found.has("DEP-02")).toBe(true); // no security headers
+    expect(r.findings.filter((f) => f.id === "INJ-04")).toHaveLength(2); // key + merge
+  });
+
+  it("does NOT flag flow2-clean (validated coupon, batched query, fixed key, helmet)", async () => {
+    const r = await scan(join(fx, "flow2-clean"), EXP);
+    for (const id of ["COM-04", "PERF-03", "INJ-04", "DEP-02"]) {
+      expect(r.findings.filter((f) => f.id === id)).toHaveLength(0);
+    }
+  });
+});
+
 describe("AUTH-01 — unauthenticated sensitive route (via raw-http route mapping)", () => {
   it("flags GET /admin/orders in lab-before (no auth) under --experimental", async () => {
     const off = await scan(labBefore);
