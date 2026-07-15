@@ -1,4 +1,5 @@
 import type { Check, ScanContext } from "../types.js";
+import { auth01 } from "./auth-01.js";
 import { auth03 } from "./auth-03.js";
 import { auth04 } from "./auth-04.js";
 import { com01 } from "./com-01.js";
@@ -8,8 +9,10 @@ import { inj01 } from "./inj-01.js";
 import { inj02 } from "./inj-02.js";
 import { inj03 } from "./inj-03.js";
 import { perf01 } from "./perf-01.js";
+import { perf02 } from "./perf-02.js";
 import { prod01 } from "./prod-01.js";
 import { prod03 } from "./prod-03.js";
+import { prod04 } from "./prod-04.js";
 import { sec01 } from "./sec-01.js";
 import { sec02 } from "./sec-02.js";
 import { sec03 } from "./sec-03.js";
@@ -35,11 +38,14 @@ export const ALL_CHECKS: Check[] = [
   web01,
   dep03,
   // flow tier (--experimental)
+  auth01,
   com01,
   inj02,
   web02,
   web03,
+  perf02,
   prod01,
+  prod04,
 ];
 
 /** Checks active for this scan: structural always, flow only under --experimental (ADR-001). */

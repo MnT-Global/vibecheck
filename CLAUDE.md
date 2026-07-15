@@ -51,12 +51,15 @@ PERF-01 (sync I/O on hot path) · PROD-03 (error leak) · COM-02 (unvalidated qu
 flagship) · AUTH-03 (hardcoded/default creds) · AUTH-04 (permissive CORS) · WEB-01 (XSS sink) ·
 DEP-03 (no tests, info).
 
-## Flow tier (`--experimental`, medium confidence — 5 so far)
-COM-01 (client-trusted price) · INJ-02 (SQL injection) · WEB-02 (SSRF) · WEB-03 (path traversal) ·
-PROD-01 (no rate limiting). Gated by `ctx.options.experimental` via `activeChecks()`. Use the
-`referencesRequestInput()` taint-lite helper for request-flow checks. **Next flow checks:** AUTH-01/02,
-COM-03/04, INJ-04, PERF-02/03, PROD-02/04, DEP-01/02, SEC-01 entropy, WEB-01 server-template — each
-graduates to structural only after passing the precision gate.
+## Flow tier (`--experimental`, medium confidence — 8 so far)
+AUTH-01 (unauth sensitive route) · COM-01 (client-trusted price) · INJ-02 (SQL injection) ·
+WEB-02 (SSRF) · WEB-03 (path traversal) · PERF-02 (full-file parse per request) · PROD-01 (no
+rate limiting) · PROD-04 (secret in logs). Gated by `ctx.options.experimental` via `activeChecks()`.
+Use `referencesRequestInput()` (taint-lite) for request-flow checks. The loader now maps **raw
+node:http routes** (`http.createServer(cb)` + `if (p === "/x")`) so AUTH-01 etc. work on
+manual-routing AI code; the F8 note only fires when routing is genuinely opaque.
+**Next flow checks:** AUTH-02, COM-03/04, INJ-04, PERF-03, PROD-02, DEP-01/02, SEC-01 entropy,
+WEB-01 server-template — each graduates to structural only after passing the precision gate.
 
 ## Gotchas
 - Block comments: never put `**/` inside a `/** ... */` JSDoc (it closes the comment early).

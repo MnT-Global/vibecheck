@@ -95,6 +95,76 @@ function extractNextAppRoutes(file: SourceFile, out: Route[]): void {
   }
 }
 
+function calleeNameLocal(call: SyntaxNode): string {
+  const fn = call.childForFieldName("function");
+  if (!fn) return "";
+  if (fn.type === "identifier") return fn.text;
+  if (fn.type === "member_expression") return fn.childForFieldName("property")?.text ?? "";
+  return "";
+}
+
+/** From an `if` condition, pull the "/path" literal and any `req.method === "X"` verb. */
+function analyzeCondition(cond: SyntaxNode): { path: string | null; method: string | null } {
+  let path: string | null = null;
+  let method: string | null = null;
+  walk(cond, (n) => {
+    if (n.type !== "binary_expression") return;
+    const op = n.childForFieldName("operator")?.text;
+    if (op !== "===" && op !== "==") return;
+    const l = n.childForFieldName("left");
+    const r = n.childForFieldName("right");
+    const lit = l?.type === "string" ? l : r?.type === "string" ? r : null;
+    const other = l?.type === "string" ? r : l;
+    if (!lit) return;
+    const val = stringLiteralValue(lit);
+    if (val.startsWith("/")) {
+      if (!path) path = val;
+    } else if (
+      other?.type === "member_expression" &&
+      other.childForFieldName("property")?.text === "method"
+    ) {
+      method = val.toUpperCase();
+    }
+  });
+  return { path, method };
+}
+
+/** Raw node:http — `http.createServer((req,res)=>{ if (p === "/x") {…} })` manual routing. */
+function extractNodeHttpRoutes(file: SourceFile, out: Route[]): void {
+  if (!file.tree) return;
+  walk(file.tree.rootNode, (node) => {
+    if (node.type !== "call_expression" || calleeNameLocal(node) !== "createServer") return;
+    const args = node.childForFieldName("arguments");
+    let cb: SyntaxNode | null = null;
+    for (let i = 0; i < (args?.namedChildCount ?? 0); i++) {
+      const a = args?.namedChild(i);
+      if (a && FUNCTION_NODES.has(a.type)) {
+        cb = a;
+        break;
+      }
+    }
+    if (!cb) return;
+    walk(cb, (n) => {
+      if (n.type !== "if_statement") return;
+      const cond = n.childForFieldName("condition");
+      if (!cond) return;
+      const { path, method } = analyzeCondition(cond);
+      if (!path) return;
+      const m = method ?? "GET";
+      out.push({
+        method: m,
+        path,
+        file: file.path,
+        line: n.startPosition.row + 1,
+        framework: "node-http",
+        isMutating: MUTATING.has(m),
+        looksSensitive: isSensitive(path),
+        handlerNode: n.childForFieldName("consequence") ?? n,
+      });
+    });
+  });
+}
+
 /**
  * Extract routes across all files. F8 honesty rule (CTO review): if a file clearly runs a
  * server but we mapped zero routes from it, say so — never let "found nothing" read as "safe".
@@ -107,6 +177,7 @@ export function extractRoutes(files: SourceFile[]): { routes: Route[]; notes: Sc
     if (file.lang === "json" || file.lang === "env") continue;
     extractExpressRoutes(file, routes);
     extractNextAppRoutes(file, routes);
+    extractNodeHttpRoutes(file, routes);
   }
 
   const serverFiles = files.filter(

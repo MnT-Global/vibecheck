@@ -37,6 +37,41 @@ describe("flow tier — gated behind --experimental", () => {
   });
 });
 
+describe("AUTH-01 — unauthenticated sensitive route (via raw-http route mapping)", () => {
+  it("flags GET /admin/orders in lab-before (no auth) under --experimental", async () => {
+    const off = await scan(labBefore);
+    expect(off.findings.filter((f) => f.id === "AUTH-01")).toHaveLength(0);
+    const on = await scan(labBefore, EXP);
+    const auth = on.findings.filter((f) => f.id === "AUTH-01");
+    expect(auth).toHaveLength(1);
+    expect(auth[0]?.title).toContain("/admin/orders");
+    expect(auth[0]?.severity).toBe("critical");
+  });
+
+  it("does NOT flag lab-after (the admin handler checks ADMIN_TOKEN)", async () => {
+    const r = await scan(labAfter, EXP);
+    expect(r.findings.filter((f) => f.id === "AUTH-01")).toHaveLength(0);
+  });
+});
+
+describe("PERF-02 — full data file parsed per request", () => {
+  it("flags lab-before's per-request db() but not lab-after's boot-time load", async () => {
+    const before = await scan(labBefore, EXP);
+    expect(before.findings.filter((f) => f.id === "PERF-02")).toHaveLength(1);
+    const after = await scan(labAfter, EXP);
+    expect(after.findings.filter((f) => f.id === "PERF-02")).toHaveLength(0);
+  });
+});
+
+describe("PROD-04 — secret written to logs", () => {
+  it("flags console/logger calls that log a secret; clean logging is fine", async () => {
+    const dirty = await scan(join(fx, "prod04-dirty"), EXP);
+    expect(dirty.findings.filter((f) => f.id === "PROD-04").length).toBeGreaterThanOrEqual(2);
+    const clean = await scan(join(fx, "prod04-clean"), EXP);
+    expect(clean.findings.filter((f) => f.id === "PROD-04")).toHaveLength(0);
+  });
+});
+
 describe("PROD-01 — no rate limiting", () => {
   it("fires on lab-before (no limiter) only under --experimental", async () => {
     const off = await scan(labBefore);
