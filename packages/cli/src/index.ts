@@ -36,6 +36,7 @@ Usage:
   vibecheck <path> --html <file>       write a shareable HTML report card
   vibecheck <path> --md                Markdown summary (for PR comments)
   vibecheck <path> --experimental      also run flow-tier (experimental) checks
+  vibecheck <path> --experimental --offline   skip the OSV dependency lookup (no network)
   vibecheck <path> --ci --min-grade B  exit 1 if below the grade threshold
 
 Built by MnT · https://mntfuture.com`;
@@ -70,7 +71,10 @@ async function main(): Promise<void> {
     return v && !v.startsWith("--") && v !== target ? v : undefined;
   };
 
-  const report = await scan(resolve(target), { experimental: args.includes("--experimental") });
+  const report = await scan(resolve(target), {
+    experimental: args.includes("--experimental"),
+    offline: args.includes("--offline"),
+  });
 
   // Primary output (mutually exclusive; terminal by default).
   if (args.includes("--json")) {

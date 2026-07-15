@@ -51,11 +51,22 @@ PERF-01 (sync I/O on hot path) · PROD-03 (error leak) · COM-02 (unvalidated qu
 flagship) · AUTH-03 (hardcoded/default creds) · AUTH-04 (permissive CORS) · WEB-01 (XSS sink) ·
 DEP-03 (no tests, info).
 
-## Flow tier (`--experimental`, medium confidence — 12 so far)
+## Flow tier (`--experimental`, medium confidence — 13 so far)
 AUTH-01 (unauth sensitive route) · COM-01 (client price) · COM-04 (client discount) · INJ-02 (SQL) ·
 INJ-04 (prototype pollution) · WEB-02 (SSRF) · WEB-03 (path traversal) · PERF-02 (full-file parse
 per request) · PERF-03 (N+1 query in loop) · PROD-01 (no rate limiting) · PROD-04 (secret in logs) ·
-DEP-02 (no security headers). Gated by `ctx.options.experimental` via `activeChecks()`. Use
+DEP-01 (known-vuln deps via OSV) · DEP-02 (no security headers). Gated by `ctx.options.experimental`
+via `activeChecks()`. Use
+
+## DEP-01 & the one network exception
+Everything is deterministic + offline EXCEPT DEP-01, which looks up npm advisories from **OSV**
+(`api.osv.dev`). It's opt-in (`--experimental`), sends only package **names/versions** (never your
+code), caches vuln details in `~/.cache/vibecheck/osv/` (offline after first run), and fails soft
+(a note, no crash) when offline or under `--offline`. Loader parses the lockfile → `ctx.dependencies`
+(package-lock.json v2/v3 solid; pnpm/yarn best-effort regex). `scan()` fetches advisories →
+`ctx.advisories`; inject `options.advisories` to test/host without network. DEP-01 itself is a PURE
+check over `ctx.advisories`.
+
 `referencesRequestInput()` (taint-lite) for request-flow checks. The loader maps **raw node:http
 routes** (`http.createServer(cb)` + `if (p === "/x")`) so AUTH-01 etc. work on manual-routing AI
 code; the F8 note only fires when routing is genuinely opaque.

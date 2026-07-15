@@ -5,6 +5,7 @@ import { auth04 } from "./auth-04.js";
 import { com01 } from "./com-01.js";
 import { com02 } from "./com-02.js";
 import { com04 } from "./com-04.js";
+import { dep01 } from "./dep-01.js";
 import { dep02 } from "./dep-02.js";
 import { dep03 } from "./dep-03.js";
 import { inj01 } from "./inj-01.js";
@@ -53,6 +54,7 @@ export const ALL_CHECKS: Check[] = [
   perf03,
   prod01,
   prod04,
+  dep01,
   dep02,
 ];
 

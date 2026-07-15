@@ -3,6 +3,7 @@ import { basename, extname, join, relative, sep } from "node:path";
 import ignore from "ignore";
 import { isParsable, parseText } from "../parse/index.js";
 import type { Lang, ScanContext, ScanNote, ScanOptions, SourceFile } from "../types.js";
+import { parseDependencies } from "./lockfile.js";
 import { extractRoutes } from "./routes.js";
 
 const DEFAULT_MAX_FILES = 5000;
@@ -157,11 +158,13 @@ export async function buildContext(root: string, options: ScanOptions = {}): Pro
 
   const { routes, notes: routeNotes } = extractRoutes(files);
   notes.push(...routeNotes);
+  const dependencies = await parseDependencies(files, root);
 
   return {
     root,
     files,
     routes,
+    dependencies,
     notes,
     options: {
       experimental: options.experimental ?? false,

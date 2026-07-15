@@ -73,6 +73,24 @@ export interface Route {
   handlerNode?: SyntaxNode;
 }
 
+/** A resolved dependency from a lockfile. */
+export interface Dependency {
+  name: string;
+  version: string;
+  dev: boolean;
+}
+
+/** A known vulnerability affecting a dependency version (from OSV/GHSA). */
+export interface Advisory {
+  id: string; // e.g. GHSA-p6mc-m468-83gw
+  severity: Severity;
+  summary: string;
+  fixed?: string; // first fixed version, if known
+}
+
+/** name@version → advisories. */
+export type AdvisoryMap = Map<string, Advisory[]>;
+
 export interface ScanOptions {
   /** Allow scanning even when the tree looks like it has private/secret files (reserved). */
   allowPrivate?: boolean;
@@ -80,6 +98,10 @@ export interface ScanOptions {
   gitHistory?: boolean;
   /** Enable flow-tier / experimental checks (OFF by default — ADR-001). */
   experimental?: boolean;
+  /** Skip the (network) OSV dependency lookup even under --experimental. */
+  offline?: boolean;
+  /** Inject advisories (tests / hosted) instead of fetching from OSV. */
+  advisories?: AdvisoryMap;
   maxFiles?: number;
   maxFileBytes?: number;
 }
@@ -88,6 +110,8 @@ export interface ScanContext {
   root: string;
   files: SourceFile[];
   routes: Route[];
+  dependencies: Dependency[];
+  advisories?: AdvisoryMap;
   notes: ScanNote[];
   options: Required<Pick<ScanOptions, "experimental" | "gitHistory" | "allowPrivate">> &
     ScanOptions;

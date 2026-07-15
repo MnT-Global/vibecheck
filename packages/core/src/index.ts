@@ -1,5 +1,6 @@
 import { activeChecks } from "./checks/index.js";
 import { buildContext } from "./loader/index.js";
+import { fetchOsvAdvisories } from "./osv/index.js";
 import { score as scoreReport } from "./scoring/index.js";
 import type { Category, Finding, Report, ScanOptions, Severity } from "./types.js";
 
@@ -9,6 +10,7 @@ export { ALL_CHECKS, activeChecks } from "./checks/index.js";
 export { CATEGORY_MAX, gradeFor, score } from "./scoring/index.js";
 export { parseText } from "./parse/index.js";
 export { extractRoutes } from "./loader/routes.js";
+export { fetchOsvAdvisories } from "./osv/index.js";
 
 const SEVERITY_ORDER: Record<Severity, number> = {
   critical: 0,
@@ -25,6 +27,21 @@ const SEVERITY_ORDER: Record<Severity, number> = {
 export async function scan(root: string, options: ScanOptions = {}): Promise<Report> {
   const started = Date.now();
   const ctx = await buildContext(root, options);
+
+  // Dependency advisories (DEP-01) — injected, or fetched from OSV under --experimental.
+  // This is the ONE network step, opt-in, and it fetches public advisory data (never your code).
+  if (options.advisories) {
+    ctx.advisories = options.advisories;
+  } else if (ctx.options.experimental && !options.offline && ctx.dependencies.length > 0) {
+    const advisories = await fetchOsvAdvisories(ctx.dependencies);
+    if (advisories) ctx.advisories = advisories;
+    else
+      ctx.notes.push({
+        level: "warn",
+        message:
+          "Couldn't reach OSV — dependency check skipped (run online once to cache advisories).",
+      });
+  }
 
   const assessed = new Set<Category>();
   const findings: Finding[] = [];
