@@ -76,25 +76,29 @@ async function main(): Promise<void> {
     offline: args.includes("--offline"),
   });
 
-  // Primary output (mutually exclusive; terminal by default).
-  if (args.includes("--json")) {
-    console.log(JSON.stringify(report, null, 2));
-  } else if (args.includes("--sarif")) {
-    const sarif = renderSarif(report, ALL_CHECKS, VERSION);
-    const file = fileFor("--sarif");
+  // Renderers by format. Each of --json/--sarif/--md may write to a file (any number in one
+  // run) or, without a file arg, print to stdout (at most one stdout format).
+  const renderers: Record<string, () => string> = {
+    "--json": () => JSON.stringify(report, null, 2),
+    "--sarif": () => renderSarif(report, ALL_CHECKS, VERSION),
+    "--md": () => renderMarkdown(report),
+  };
+  let stdoutFormat: string | undefined;
+  for (const flag of Object.keys(renderers)) {
+    if (!args.includes(flag)) continue;
+    const file = fileFor(flag);
     if (file) {
-      await writeFile(file, sarif);
-      console.error(`SARIF written to ${file}`);
+      await writeFile(file, renderers[flag]?.() ?? "");
+      console.error(`${flag.slice(2)} written to ${file}`);
+    } else if (stdoutFormat) {
+      console.error(`error: ${flag} and ${stdoutFormat} both target stdout — give one a file path`);
+      process.exit(1);
     } else {
-      console.log(sarif);
+      stdoutFormat = flag;
     }
-  } else if (args.includes("--md")) {
-    console.log(renderMarkdown(report));
-  } else {
-    console.log(renderTerminal(report));
   }
 
-  // Side output: an HTML report card written to a file.
+  // --html always writes a file.
   if (args.includes("--html")) {
     const file = fileFor("--html");
     if (!file) {
@@ -102,8 +106,11 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     await writeFile(file, renderHtml(report, basename(resolve(target)), VERSION));
-    console.error(`HTML report written to ${file}`);
+    console.error(`html written to ${file}`);
   }
+
+  // stdout: the chosen machine format, else the human terminal report.
+  console.log(stdoutFormat ? (renderers[stdoutFormat]?.() ?? "") : renderTerminal(report));
 
   // CI gate.
   if (args.includes("--ci")) {

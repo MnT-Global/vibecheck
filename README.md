@@ -77,19 +77,44 @@ npx @mntglobal/vibecheck <path> --ci --min-grade B # exit 1 below the threshold
 npx @mntglobal/vibecheck <path> --experimental   # also run flow-tier checks
 ```
 
-## GitHub Actions
+## GitHub Action
 
-Fail a PR below a grade and surface findings inline in the **Security → Code scanning** tab:
+Add vibecheck to any PR — it posts a summary comment, uploads findings to the
+**Security → Code scanning** tab, and fails the check below a grade:
 
 ```yaml
-- run: npx @mntglobal/vibecheck . --sarif vibecheck.sarif --ci --min-grade B
-- uses: github/codeql-action/upload-sarif@v3
-  if: always()
-  with:
-    sarif_file: vibecheck.sarif
+# .github/workflows/vibecheck.yml
+name: vibecheck
+on: pull_request
+permissions:
+  contents: read
+  security-events: write   # upload SARIF to code scanning
+  pull-requests: write     # post the summary comment
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: MnT-Global/vibecheck@v0.1.0
+        with:
+          min-grade: B
+          # experimental: true   # also run the flow-tier checks
 ```
 
-Your code never leaves the runner — the scan is local and deterministic.
+Inputs: `path`, `min-grade`, `experimental`, `offline`, `comment`, `upload-sarif`, `version`,
+`working-directory`. Outputs: `grade`, `score`.
+
+Prefer the raw CLI in your own pipeline? Run it and upload the SARIF yourself:
+
+```yaml
+- run: npx @mntglobal/vibecheck . --sarif out.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with: { sarif_file: out.sarif }
+```
+
+Either way your code never leaves the runner — the scan is local and deterministic (the only
+network call is the opt-in OSV dependency lookup, which sends package names/versions only).
 
 ## Limitations (honestly)
 

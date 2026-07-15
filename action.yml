@@ -1,0 +1,112 @@
+name: vibecheck
+description: Scan an AI-built codebase for security, commerce-logic, and production-readiness issues.
+author: MnT
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: Path to scan.
+    required: false
+    default: "."
+  min-grade:
+    description: Fail the job if the grade is below this (e.g. B). Set to "" to never fail.
+    required: false
+    default: "C"
+  experimental:
+    description: Also run flow-tier (experimental) checks.
+    required: false
+    default: "false"
+  offline:
+    description: Skip the OSV dependency lookup (no network).
+    required: false
+    default: "false"
+  comment:
+    description: Post/update a summary comment on the pull request.
+    required: false
+    default: "true"
+  upload-sarif:
+    description: Upload SARIF to GitHub code scanning (Security tab).
+    required: false
+    default: "true"
+  version:
+    description: vibecheck version or npm dist-tag to run.
+    required: false
+    default: "latest"
+  working-directory:
+    description: Directory to run in.
+    required: false
+    default: "."
+
+outputs:
+  grade:
+    description: The letter grade (F..A+).
+    value: ${{ steps.scan.outputs.grade }}
+  score:
+    description: The score (0-100).
+    value: ${{ steps.scan.outputs.score }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run vibecheck
+      id: scan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -eo pipefail
+        FLAGS=()
+        if [ "${{ inputs.experimental }}" = "true" ]; then FLAGS+=(--experimental); fi
+        if [ "${{ inputs.offline }}" = "true" ]; then FLAGS+=(--offline); fi
+        npx -y "@mntglobal/vibecheck@${{ inputs.version }}" "${{ inputs.path }}" \
+          --sarif "$RUNNER_TEMP/vibecheck.sarif" \
+          --json  "$RUNNER_TEMP/vibecheck.json" \
+          --md    "$RUNNER_TEMP/vibecheck.md" \
+          "${FLAGS[@]}"
+        {
+          echo "grade=$(node -p "require('$RUNNER_TEMP/vibecheck.json').grade")"
+          echo "score=$(node -p "require('$RUNNER_TEMP/vibecheck.json').score")"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Upload SARIF to code scanning
+      if: ${{ inputs.upload-sarif == 'true' }}
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
+      with:
+        sarif_file: ${{ runner.temp }}/vibecheck.sarif
+        category: vibecheck
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      continue-on-error: true
+      with:
+        script: |
+          const fs = require("fs");
+          const marker = "<!-- vibecheck-report -->";
+          const body = marker + "\n" + fs.readFileSync(process.env.RUNNER_TEMP + "/vibecheck.md", "utf8");
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+          const existing = comments.find((c) => c.body && c.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          }
+
+    - name: Enforce minimum grade
+      shell: bash
+      run: |
+        node -e '
+          const r = require(process.env.RUNNER_TEMP + "/vibecheck.json");
+          const min = "${{ inputs.min-grade }}";
+          if (!min) { console.log("vibecheck: grade " + r.grade + " / " + r.score + " (no gate)"); process.exit(0); }
+          const order = ["F","D-","D","D+","C-","C","C+","B-","B","B+","A-","A","A+"];
+          if (order.indexOf(r.grade) < order.indexOf(min)) {
+            console.error("::error::vibecheck grade " + r.grade + " is below the required " + min);
+            process.exit(1);
+          }
+          console.log("vibecheck: grade " + r.grade + " / " + r.score + " (>= " + min + ")");
+        '
