@@ -1,6 +1,6 @@
 {
   "name": "@mntglobal/vibecheck",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "vibecheck — is your AI-built store secure and production-ready? Scan the code, get a graded report. Built by MnT.",
   "license": "MIT",
   "type": "module",

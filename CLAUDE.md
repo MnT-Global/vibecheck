@@ -14,7 +14,7 @@ Detection specs: `docs/rules.md`. CTO review (decisions): `docs/cto-review-r0.md
 
 ## Architecture (do not violate)
 - `packages/core` = engine: loader → parse (tree-sitter) → ScanContext → checks[] → scorer → Report
-- `packages/cli`  = presentation ONLY (terminal / json renderers)
+- `packages/cli`  = presentation ONLY (renderers: terminal / json / sarif / html / md)
 - Checks are PURE functions `(ctx) => Finding[]`. ALL I/O (walk, read, git, parse) lives in the
   loader. A check that touches the filesystem is a bug.
 - New check = `src/checks/<id>.ts` + fixture tests (pass/fail) + registry entry in `checks/index.ts`

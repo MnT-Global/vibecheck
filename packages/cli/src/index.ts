@@ -1,7 +1,15 @@
 #!/usr/bin/env node
-import { resolve } from "node:path";
-import { type Grade, scan } from "@mntglobal/vibecheck-core";
+import { writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { basename, resolve } from "node:path";
+import { ALL_CHECKS, type Grade, scan } from "@mntglobal/vibecheck-core";
+import { renderHtml } from "./renderers/html.js";
+import { renderMarkdown } from "./renderers/markdown.js";
+import { renderSarif } from "./renderers/sarif.js";
 import { renderTerminal } from "./renderers/terminal.js";
+
+const pkg = createRequire(import.meta.url)("../package.json") as { version: string };
+const VERSION = pkg.version;
 
 const GRADE_RANK: Grade[] = [
   "F",
@@ -19,13 +27,16 @@ const GRADE_RANK: Grade[] = [
   "A+",
 ];
 
-const USAGE = `vibecheck — is your AI-built store secure & production-ready?
+const USAGE = `vibecheck ${VERSION} — is your AI-built store secure & production-ready?
 
 Usage:
-  vibecheck <path>              scan a local directory
-  vibecheck <path> --json       machine-readable output
-  vibecheck <path> --experimental   also run flow-tier (experimental) checks
-  vibecheck <path> --ci --min-grade B   exit 1 if below the grade threshold
+  vibecheck <path>                     scan a local directory
+  vibecheck <path> --json              machine-readable JSON (stdout)
+  vibecheck <path> --sarif [file]      SARIF 2.1.0 (GitHub Code Scanning); stdout if no file
+  vibecheck <path> --html <file>       write a shareable HTML report card
+  vibecheck <path> --md                Markdown summary (for PR comments)
+  vibecheck <path> --experimental      also run flow-tier (experimental) checks
+  vibecheck <path> --ci --min-grade B  exit 1 if below the grade threshold
 
 Built by MnT · https://mntfuture.com`;
 
@@ -40,26 +51,59 @@ async function main(): Promise<void> {
     console.log(USAGE);
     process.exit(args.length === 0 ? 1 : 0);
   }
+  if (args.includes("--version") || args.includes("-v")) {
+    console.log(VERSION);
+    process.exit(0);
+  }
 
-  const target = args.find((a) => !a.startsWith("--") && a !== flagValue(args, "--min-grade"));
+  const minGrade = flagValue(args, "--min-grade");
+  const target = args.find((a) => !a.startsWith("--") && a !== minGrade);
   if (!target) {
     console.error("error: no scan path given\n");
     console.log(USAGE);
     process.exit(1);
   }
 
-  const report = await scan(resolve(target), {
-    experimental: args.includes("--experimental"),
-  });
+  // A file argument for a flag: the next token, unless it's another flag or the scan path.
+  const fileFor = (name: string): string | undefined => {
+    const v = flagValue(args, name);
+    return v && !v.startsWith("--") && v !== target ? v : undefined;
+  };
 
+  const report = await scan(resolve(target), { experimental: args.includes("--experimental") });
+
+  // Primary output (mutually exclusive; terminal by default).
   if (args.includes("--json")) {
     console.log(JSON.stringify(report, null, 2));
+  } else if (args.includes("--sarif")) {
+    const sarif = renderSarif(report, ALL_CHECKS, VERSION);
+    const file = fileFor("--sarif");
+    if (file) {
+      await writeFile(file, sarif);
+      console.error(`SARIF written to ${file}`);
+    } else {
+      console.log(sarif);
+    }
+  } else if (args.includes("--md")) {
+    console.log(renderMarkdown(report));
   } else {
     console.log(renderTerminal(report));
   }
 
+  // Side output: an HTML report card written to a file.
+  if (args.includes("--html")) {
+    const file = fileFor("--html");
+    if (!file) {
+      console.error("error: --html requires a file path, e.g. --html report.html");
+      process.exit(1);
+    }
+    await writeFile(file, renderHtml(report, basename(resolve(target)), VERSION));
+    console.error(`HTML report written to ${file}`);
+  }
+
+  // CI gate.
   if (args.includes("--ci")) {
-    const min = (flagValue(args, "--min-grade") ?? "C") as Grade;
+    const min = (minGrade ?? "C") as Grade;
     const minIdx = GRADE_RANK.indexOf(min);
     const gotIdx = GRADE_RANK.indexOf(report.grade);
     if (minIdx >= 0 && gotIdx < minIdx) {

@@ -12,18 +12,23 @@ npx @mntglobal/vibecheck ./my-store
 ```
 
 ```
-   D   50/100  · 2 files · 20ms
-   1 critical
+   F   40/100  · 2 files · 30ms
+   2 critical · 3 high · 2 low
 
    CRITICAL  Hardcoded Stripe secret key [SEC-01]
     server.js:15
     const PAYMENT_API_KEY = "sk_live_…";
     → Move this secret to an environment variable and rotate the exposed key immediately.
+
+   HIGH  Order quantity/amount used in pricing without validation [COM-02]
+    server.js:80
+    const total = prod ? prod.price * qty : 0;
+    → Validate as an integer in a sane range before use.
 ```
 
-> **Status: early (v0.1, Sprint 0).** The engine, the deterministic core, and the first check
-> (SEC-01, hardcoded secrets) are live and tested. More checks land per the
-> [build plan](../VIBECHECK-BUILD-PLAN.md) — each gated on a precision bar before it's on by default.
+> **Status: v0.1 — 13 high-confidence checks live.** Each is gated on a precision bar (zero false
+> criticals on clean code) before it's on by default. Deeper flow-analysis checks ship behind
+> `--experimental` and graduate the same way.
 
 ## Why
 
@@ -32,15 +37,25 @@ client-supplied prices. Veracode's 2025 report found **45% of AI-generated code 
 OWASP Top-10 vulnerability.** `vibecheck` is the independent, commerce-tuned second opinion that
 the AI which *wrote* the code can't reliably give.
 
-## What it checks (growing)
+## What it checks
 
-8 categories, 100 points: **Secrets · Injection · Auth · Commerce-logic · Web · Performance ·
-Production-hardening · Dependencies.** The commerce-logic checks (price/quantity tampering,
-client-trusted totals) are the wedge no generic scanner covers.
+8 categories, 100 points. The commerce-logic checks (price/quantity tampering, client-trusted
+totals) are the wedge no generic scanner covers. v0.1 ships these **13 high-confidence checks**:
 
-**v0.1 ships the high-confidence, structural checks first.** Deeper flow-analysis checks ship
-behind `--experimental` and graduate only after they pass a measured precision gate — because a
-false "critical" is worse than none.
+| Category | Checks |
+|---|---|
+| Secrets | `SEC-01` provider keys · `SEC-02` secret in a public env var · `SEC-03` committed `.env` · `SEC-04` private keys / DB URIs |
+| Injection | `INJ-01` `eval`/`new Function` · `INJ-03` command injection |
+| Commerce | `COM-02` unvalidated order quantity ⭐ |
+| Auth | `AUTH-03` hardcoded/default creds · `AUTH-04` permissive CORS |
+| Web | `WEB-01` XSS sink (`dangerouslySetInnerHTML`/`innerHTML`) |
+| Performance | `PERF-01` sync I/O on the request path |
+| Production | `PROD-03` internal error leaked to client |
+| Dependencies | `DEP-03` no test suite (info) |
+
+Deeper flow-analysis checks (client-trusted price, IDOR, SSRF, taint-based injection/XSS, dependency
+CVEs, …) ship behind `--experimental` and graduate to on-by-default only after they pass a measured
+precision gate — because a false "critical" is worse than none.
 
 ## How it works
 
@@ -53,10 +68,28 @@ false "critical" is worse than none.
 ## Usage
 
 ```bash
-npx @mntglobal/vibecheck <path>            # scan a directory
-npx @mntglobal/vibecheck <path> --json     # machine-readable
-npx @mntglobal/vibecheck <path> --ci --min-grade B   # exit 1 below the threshold
+npx @mntglobal/vibecheck <path>                  # scan a directory
+npx @mntglobal/vibecheck <path> --json           # machine-readable JSON
+npx @mntglobal/vibecheck <path> --sarif out.sarif  # SARIF 2.1.0 (GitHub Code Scanning)
+npx @mntglobal/vibecheck <path> --html report.html # shareable HTML report card
+npx @mntglobal/vibecheck <path> --md             # Markdown (for PR comments)
+npx @mntglobal/vibecheck <path> --ci --min-grade B # exit 1 below the threshold
+npx @mntglobal/vibecheck <path> --experimental   # also run flow-tier checks
 ```
+
+## GitHub Actions
+
+Fail a PR below a grade and surface findings inline in the **Security → Code scanning** tab:
+
+```yaml
+- run: npx @mntglobal/vibecheck . --sarif vibecheck.sarif --ci --min-grade B
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: vibecheck.sarif
+```
+
+Your code never leaves the runner — the scan is local and deterministic.
 
 ## Limitations (honestly)
 

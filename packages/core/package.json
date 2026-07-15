@@ -1,6 +1,6 @@
 {
   "name": "@mntglobal/vibecheck-core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "vibecheck engine — deterministic checks over a ScanContext. Built by MnT.",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,7 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "wasm"],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
