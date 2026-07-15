@@ -49,8 +49,14 @@ SEC-01 (provider secrets) · SEC-02 (secret in public-prefixed env var) · SEC-0
 SEC-04 (private keys / DB URIs) · INJ-01 (eval/new Function) · INJ-03 (command injection) ·
 PERF-01 (sync I/O on hot path) · PROD-03 (error leak) · COM-02 (unvalidated quantity — commerce
 flagship) · AUTH-03 (hardcoded/default creds) · AUTH-04 (permissive CORS) · WEB-01 (XSS sink) ·
-DEP-03 (no tests, info). **Next: the flow tier behind `--experimental`** (COM-01/03/04, AUTH-01/02,
-INJ-02, WEB-01-server, etc.), then Sprint 2 (SARIF/`--html`/`--md`) → v0.1.0.
+DEP-03 (no tests, info).
+
+## Flow tier (`--experimental`, medium confidence — 5 so far)
+COM-01 (client-trusted price) · INJ-02 (SQL injection) · WEB-02 (SSRF) · WEB-03 (path traversal) ·
+PROD-01 (no rate limiting). Gated by `ctx.options.experimental` via `activeChecks()`. Use the
+`referencesRequestInput()` taint-lite helper for request-flow checks. **Next flow checks:** AUTH-01/02,
+COM-03/04, INJ-04, PERF-02/03, PROD-02/04, DEP-01/02, SEC-01 entropy, WEB-01 server-template — each
+graduates to structural only after passing the precision gate.
 
 ## Gotchas
 - Block comments: never put `**/` inside a `/** ... */` JSDoc (it closes the comment early).

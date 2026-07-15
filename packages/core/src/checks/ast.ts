@@ -1,5 +1,27 @@
 import { stringLiteralValue } from "../loader/redact.js";
+import { walk } from "../parse/index.js";
 import type { SyntaxNode } from "../types.js";
+
+/** Identifiers that root a request-input access (req.query, body.x, params.id, …). */
+const REQUEST_ROOT = /^(?:req|request|body|query|params|payload|input|ctx|args)$/i;
+
+/** Drill a member-expression chain down to its base identifier name. */
+function rootName(node: SyntaxNode): string {
+  let cur: SyntaxNode | null = node;
+  while (cur && cur.type === "member_expression") cur = cur.childForFieldName("object");
+  return cur?.type === "identifier" ? cur.text : "";
+}
+
+/** Intra-scope taint-lite: does this subtree read from request input (req/body/query/…)? */
+export function referencesRequestInput(node: SyntaxNode): boolean {
+  if (node.type === "member_expression" && REQUEST_ROOT.test(rootName(node))) return true;
+  let hit = false;
+  walk(node, (n) => {
+    if (hit) return false;
+    if (n.type === "member_expression" && REQUEST_ROOT.test(rootName(n))) hit = true;
+  });
+  return hit;
+}
 
 const FUNCTION_TYPES: ReadonlySet<string> = new Set([
   "function_declaration",
