@@ -50,6 +50,16 @@ describe("PROD-03 — internal error detail leaked to client", () => {
     const r = await scan(labAfter);
     expect(r.findings.filter((f) => f.id === "PROD-03")).toHaveLength(0);
   });
+
+  it("skips client-side files (a UI error toast) but still flags the server handler", async () => {
+    const r = await scan(join(here, "fixtures", "prod03-client"));
+    const prod03 = r.findings.filter((f) => f.id === "PROD-03");
+    // the React component's showErrorToast(error.message) must NOT fire...
+    expect(prod03.some((f) => f.file.includes("OrderDetail"))).toBe(false);
+    // ...but the server handler's res.json({ error: e.message }) still must.
+    expect(prod03.some((f) => f.file.includes("handler"))).toBe(true);
+    expect(prod03).toHaveLength(1);
+  });
 });
 
 describe("precision gate — the hardened fixture", () => {

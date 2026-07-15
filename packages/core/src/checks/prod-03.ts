@@ -46,7 +46,11 @@ export const prod03: Check = {
     const seen = new Set<string>();
 
     for (const file of ctx.files) {
-      if (!file.tree || isTestOrExampleFile(file.path)) continue;
+      // PROD-03 is about a SERVER leaking internal error detail in its HTTP response. In a
+      // client-side file (a React component, etc.) `showErrorToast(err.message)` is ordinary UI,
+      // not a leak — and the "log server-side, return a correlation id" fix can't even apply
+      // there. Skip client files so a frontend's error toasts don't produce a wall of false lows.
+      if (!file.tree || file.isClient || isTestOrExampleFile(file.path)) continue;
 
       for (const catchNode of findNodes(file.tree.rootNode, CATCH_NODE)) {
         const param = catchNode.childForFieldName("parameter");
