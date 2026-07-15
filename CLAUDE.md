@@ -40,13 +40,17 @@ Detection specs: `docs/rules.md`. CTO review (decisions): `docs/cto-review-r0.md
 ## Anchor fixtures (the regression gate)
 - `fixtures/lab-before` (vendored from ai-cleanup-lab/before) → must light up findings → low grade.
 - `fixtures/lab-after`  (vendored from ai-cleanup-lab/after)  → must score near-clean (A/B).
-  Current: lab-before **F 40** (7 findings), lab-after **A+ 100** (clean). If lab-after regresses, CI fails.
+  Current: lab-before **F 40** (7 findings), lab-after **A 94** (one *true* medium — the
+  `ADMIN_TOKEN || "admin-2024"` weak default; no false criticals/highs). If lab-after regresses
+  below A, or gains a false critical/high, CI/tests fail.
 
-## Shipped checks (structural tier, on by default)
-SEC-01 (provider secrets) · SEC-04 (private keys / DB URIs) · INJ-01 (eval/new Function) ·
-PERF-01 (sync I/O on hot path) · PROD-03 (error leak) · COM-02 (unvalidated quantity — the
-commerce flagship) · DEP-03 (no tests, info). Next: SEC-02/03, AUTH-03/04, WEB-01(JSX), then the
-flow tier behind `--experimental`.
+## Shipped checks — full structural tier (13, on by default)
+SEC-01 (provider secrets) · SEC-02 (secret in public-prefixed env var) · SEC-03 (committed .env) ·
+SEC-04 (private keys / DB URIs) · INJ-01 (eval/new Function) · INJ-03 (command injection) ·
+PERF-01 (sync I/O on hot path) · PROD-03 (error leak) · COM-02 (unvalidated quantity — commerce
+flagship) · AUTH-03 (hardcoded/default creds) · AUTH-04 (permissive CORS) · WEB-01 (XSS sink) ·
+DEP-03 (no tests, info). **Next: the flow tier behind `--experimental`** (COM-01/03/04, AUTH-01/02,
+INJ-02, WEB-01-server, etc.), then Sprint 2 (SARIF/`--html`/`--md`) → v0.1.0.
 
 ## Gotchas
 - Block comments: never put `**/` inside a `/** ... */` JSDoc (it closes the comment early).

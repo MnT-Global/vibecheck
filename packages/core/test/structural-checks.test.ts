@@ -52,11 +52,18 @@ describe("PROD-03 — internal error detail leaked to client", () => {
   });
 });
 
-describe("precision gate — the hardened fixture stays clean", () => {
-  it("lab-after has ZERO non-info findings and grades A+ (no false positives)", async () => {
+describe("precision gate — the hardened fixture", () => {
+  it("lab-after has no false criticals/highs; only the one real weak-default medium", async () => {
     const r = await scan(labAfter);
-    expect(r.findings.filter((f) => f.severity !== "info")).toHaveLength(0);
-    expect(r.grade).toBe("A+");
+    // no false positives at critical/high severity
+    expect(r.findings.filter((f) => f.severity === "critical")).toHaveLength(0);
+    expect(r.findings.filter((f) => f.severity === "high")).toHaveLength(0);
+    // the ONE true positive: `ADMIN_TOKEN || "admin-2024"` (the placeholder default is skipped)
+    const nonInfo = r.findings.filter((f) => f.severity !== "info");
+    expect(nonInfo).toHaveLength(1);
+    expect(nonInfo[0]?.id).toBe("AUTH-03");
+    expect(nonInfo[0]?.severity).toBe("medium");
+    expect(r.grade).toBe("A");
   });
 
   it("lab-before lights up 4+ categories and scores below C", async () => {
@@ -66,8 +73,9 @@ describe("precision gate — the hardened fixture stays clean", () => {
     expect(r.score).toBeLessThan(60);
   });
 
-  it("no critical is ever a false positive on the clean fixture", async () => {
-    const r = await scan(labAfter);
-    expect(r.findings.filter((f) => f.severity === "critical")).toHaveLength(0);
+  it("lab-before grades far worse than lab-after", async () => {
+    const before = await scan(labBefore);
+    const after = await scan(labAfter);
+    expect(after.score - before.score).toBeGreaterThan(40);
   });
 });

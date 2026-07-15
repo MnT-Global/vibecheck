@@ -8,6 +8,50 @@ import { scan } from "../src/index.js";
 const here = dirname(fileURLToPath(import.meta.url));
 const fx = join(here, "fixtures");
 
+describe("INJ-03 — command injection", () => {
+  it("flags execSync built from a non-constant value", async () => {
+    const r = await scan(join(fx, "inj03-dirty"));
+    const inj = r.findings.filter((f) => f.id === "INJ-03");
+    expect(inj).toHaveLength(1);
+    expect(inj[0]?.line).toBe(4);
+    expect(inj[0]?.severity).toBe("high");
+  });
+
+  it("does NOT flag execFile with an args array, nor regex.exec on input", async () => {
+    const r = await scan(join(fx, "inj03-clean"));
+    expect(r.findings.filter((f) => f.id === "INJ-03")).toHaveLength(0);
+  });
+});
+
+describe("AUTH-03 — hardcoded / default credentials", () => {
+  it("flags a credential compared to a literal (high) and an insecure default (medium)", async () => {
+    const r = await scan(join(fx, "auth03-dirty"));
+    const auth = r.findings.filter((f) => f.id === "AUTH-03");
+    expect(auth).toHaveLength(2);
+    expect(auth.some((f) => f.severity === "high" && f.line === 5)).toBe(true);
+    expect(auth.some((f) => f.severity === "medium" && f.line === 1)).toBe(true);
+  });
+
+  it("does NOT flag env vars without defaults or hashed verification", async () => {
+    const r = await scan(join(fx, "auth03-clean"));
+    expect(r.findings.filter((f) => f.id === "AUTH-03")).toHaveLength(0);
+  });
+});
+
+describe("SEC-02 — secret via a client-side env var", () => {
+  it("flags NEXT_PUBLIC_/VITE_ vars named like a secret", async () => {
+    const r = await scan(join(fx, "sec02-dirty"));
+    const sec = r.findings.filter((f) => f.id === "SEC-02");
+    expect(sec).toHaveLength(2);
+    expect(sec.every((f) => f.severity === "high")).toBe(true);
+  });
+
+  it("does NOT flag publishable keys, public URLs, or server-only secrets", async () => {
+    const r = await scan(join(fx, "sec02-clean"));
+    expect(r.findings.filter((f) => f.id === "SEC-02")).toHaveLength(0);
+  });
+});
+
 describe("AUTH-04 — permissive CORS", () => {
   it("flags origin:'*' with credentials:true", async () => {
     const r = await scan(join(fx, "cors-dirty"));
