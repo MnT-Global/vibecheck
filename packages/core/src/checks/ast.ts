@@ -1,3 +1,4 @@
+import { stringLiteralValue } from "../loader/redact.js";
 import type { SyntaxNode } from "../types.js";
 
 const FUNCTION_TYPES: ReadonlySet<string> = new Set([
@@ -63,4 +64,37 @@ export function isMemberAccess(node: SyntaxNode, objName: string, propName: stri
 /** Nearest enclosing call/new expression, or null. */
 export function nearestCall(node: SyntaxNode): SyntaxNode | null {
   return ancestorOfType(node, new Set(["call_expression", "new_expression"]));
+}
+
+/** The value node of an object literal's `<keyName>: value` pair, or null. */
+export function objectPropValue(obj: SyntaxNode, keyName: string): SyntaxNode | null {
+  if (obj.type !== "object") return null;
+  for (let i = 0; i < obj.namedChildCount; i++) {
+    const pair = obj.namedChild(i);
+    if (pair?.type !== "pair") continue;
+    const key = pair.childForFieldName("key");
+    if (!key) continue;
+    const keyText = key.type === "string" ? stringLiteralValue(key) : key.text;
+    if (keyText === keyName) return pair.childForFieldName("value");
+  }
+  return null;
+}
+
+/** Find the first descendant object-pair value whose key matches (handles nested objects). */
+export function findPropValueDeep(root: SyntaxNode, keyName: string): SyntaxNode | null {
+  const stack: SyntaxNode[] = [root];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node) continue;
+    if (node.type === "pair") {
+      const key = node.childForFieldName("key");
+      const keyText = key ? (key.type === "string" ? stringLiteralValue(key) : key.text) : "";
+      if (keyText === keyName) return node.childForFieldName("value");
+    }
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const c = node.namedChild(i);
+      if (c) stack.push(c);
+    }
+  }
+  return null;
 }
