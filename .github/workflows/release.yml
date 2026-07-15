@@ -11,6 +11,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +33,13 @@ jobs:
       - run: pnpm build
 
       # Publishes @mntglobal/vibecheck-core then @mntglobal/vibecheck (workspace:* → real versions).
-      - run: pnpm -r publish --access public --no-git-checks --provenance
+      - name: Publish to npm
+        if: env.HAS_NPM_TOKEN == 'true'
+        run: pnpm -r publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
+
+      - name: Publish skipped (no NPM_TOKEN)
+        if: env.HAS_NPM_TOKEN != 'true'
+        run: echo "::warning::NPM_TOKEN secret is not set — build verified but publish was skipped. Add the repo secret NPM_TOKEN and re-run this workflow to publish."
