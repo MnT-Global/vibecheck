@@ -3,6 +3,24 @@
   "version": "0.1.0",
   "description": "vibecheck — is your AI-built store secure and production-ready? Scan the code, get a graded report. Built by MnT.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MnT-Global/vibecheck.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/MnT-Global/vibecheck#readme",
+  "bugs": "https://github.com/MnT-Global/vibecheck/issues",
+  "keywords": [
+    "security",
+    "sast",
+    "static-analysis",
+    "code-scanning",
+    "sarif",
+    "ecommerce",
+    "ai",
+    "vibe-coding",
+    "cli"
+  ],
   "type": "module",
   "bin": {
     "vibecheck": "./dist/index.js"

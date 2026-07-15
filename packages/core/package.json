@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "description": "vibecheck engine — deterministic checks over a ScanContext. Built by MnT.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MnT-Global/vibecheck.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/MnT-Global/vibecheck#readme",
+  "bugs": "https://github.com/MnT-Global/vibecheck/issues",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
