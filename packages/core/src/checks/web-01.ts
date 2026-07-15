@@ -1,7 +1,7 @@
 import { truncate } from "../loader/redact.js";
 import { walk } from "../parse/index.js";
 import type { Check, Finding, ScanContext, SyntaxNode } from "../types.js";
-import { calleeName, findPropValueDeep, isConstantString } from "./ast.js";
+import { calleeName, enclosingFunction, findPropValueDeep, isConstantString } from "./ast.js";
 import { isTestOrExampleFile, lineAt } from "./shared.js";
 
 const DOCS = "https://github.com/MnT-Global/vibecheck/blob/main/docs/rules.md#web-01";
@@ -16,10 +16,44 @@ const SANITIZERS: ReadonlySet<string> = new Set([
   "clean",
 ]);
 
-/** A value is "safe enough" if it's a constant string or wrapped in a sanitizer call. */
-function isSafeHtml(value: SyntaxNode): boolean {
+/** A constant string, or a direct sanitizer call — the two "definitely safe" value shapes. */
+function isDirectlySafe(value: SyntaxNode): boolean {
   if (isConstantString(value)) return true;
   if (value.type === "call_expression") return SANITIZERS.has(calleeName(value).toLowerCase());
+  return false;
+}
+
+function rootOf(node: SyntaxNode): SyntaxNode {
+  let n = node;
+  while (n.parent) n = n.parent;
+  return n;
+}
+
+/** The value assigned to `const <name> = …` nearest in `scope` (one hop, no recursion). */
+function assignedValue(name: string, scope: SyntaxNode): SyntaxNode | null {
+  let found: SyntaxNode | null = null;
+  walk(scope, (n) => {
+    if (found) return false;
+    if (n.type === "variable_declarator" && n.childForFieldName("name")?.text === name) {
+      found = n.childForFieldName("value") ?? null;
+      return false;
+    }
+  });
+  return found;
+}
+
+/**
+ * Is the value safe? A constant/sanitizer call is safe directly; an *identifier* is safe when its
+ * in-scope definition is a constant or a sanitizer call — so the idiomatic
+ * `const clean = DOMPurify.sanitize(x); …__html: clean` is not flagged (it's the correct fix).
+ */
+function isSafeHtml(value: SyntaxNode): boolean {
+  if (isDirectlySafe(value)) return true;
+  if (value.type === "identifier") {
+    const scope = enclosingFunction(value) ?? rootOf(value);
+    const def = assignedValue(value.text, scope);
+    return !!def && def.startIndex !== value.startIndex && isDirectlySafe(def);
+  }
   return false;
 }
 

@@ -29,33 +29,48 @@ describe("scoring (fixed-100 model)", () => {
     expect(r.grade).toBe("A+");
   });
 
-  it("deducts per finding: one critical in secrets → 100 - min(25,20) = 80", () => {
+  it("severity floor: one critical drops to D, even though the point model alone says 80", () => {
+    // point model: 100 - min(25,20) = 80; the critical severity floor caps it at 50.
     const r = score([finding({ severity: "critical" })], new Set(["secrets"]));
-    expect(r.score).toBe(80);
+    expect(r.score).toBe(50);
+    expect(r.grade).toBe("D");
+  });
+
+  it("severity floor: any critical caps the grade at D regardless of which category it lives in", () => {
+    // one critical in a low-weight category: point model = 100 - min(25,5) = 95, floored to 50.
+    const r = score([finding({ severity: "critical", category: "deps" })], new Set(["deps"]));
+    expect(r.score).toBe(50);
+    expect(r.grade).toBe("D");
+  });
+
+  it("severity floor: a lone high can't grade above B (no more A- for a single high)", () => {
+    // point model = 100 - min(12,10) = 90 (would be A-); the high floor caps at 82 → B.
+    const r = score([finding({ severity: "high", category: "web" })], new Set(["web"]));
+    expect(r.score).toBe(82);
     expect(r.grade).toBe("B");
   });
 
-  it("a category's damage is capped at its weight (many findings don't over-deduct)", () => {
+  it("a category's damage is capped at its weight (highs, below the critical floor)", () => {
     const many = [
-      finding({ severity: "critical", line: 1 }),
-      finding({ severity: "critical", line: 2 }),
-      finding({ severity: "critical", line: 3 }),
+      finding({ severity: "high", line: 1 }),
+      finding({ severity: "high", line: 2 }),
+      finding({ severity: "high", line: 3 }),
     ];
+    // 3 highs = -36 raw, capped at the secrets weight 20 → 80; the high floor (82) doesn't bite.
     const r = score(many, new Set(["secrets"]));
-    expect(r.score).toBe(80); // secrets capped at 20
+    expect(r.score).toBe(80);
   });
 
-  it("more findings never raise the score (deductions accumulate across categories)", () => {
-    const one = score([finding({ severity: "critical", category: "secrets" })], new Set());
+  it("more findings never raise the score", () => {
+    const one = score([finding({ severity: "high", category: "secrets" })], new Set());
     const two = score(
       [
-        finding({ severity: "critical", category: "secrets" }),
+        finding({ severity: "high", category: "secrets" }),
         finding({ severity: "high", category: "injection" }),
       ],
       new Set(),
     );
     expect(two.score).toBeLessThan(one.score);
-    expect(two.score).toBe(100 - 20 - 12); // secrets capped 20 + injection high 12 = 68
   });
 
   it("info findings never affect the score", () => {

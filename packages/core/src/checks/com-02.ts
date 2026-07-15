@@ -7,15 +7,12 @@ import { isTestOrExampleFile, lineAt } from "./shared.js";
 const DOCS = "https://github.com/MnT-Global/vibecheck/blob/main/docs/rules.md#com-02";
 
 const QTY_FIELDS: ReadonlySet<string> = new Set(["qty", "quantity", "amount", "count", "units"]);
-/** Identifiers that plausibly hold parsed request input. */
-const REQUEST_OBJECTS: ReadonlySet<string> = new Set([
-  "body",
-  "payload",
-  "input",
-  "reqbody",
-  "requestbody",
-]);
-const ARITHMETIC = new Set(["*", "+", "-"]);
+/** Identifiers that plausibly hold parsed request input. (Generic `input`/`payload` were dropped —
+ * they name too many trusted server objects to be a reliable request signal.) */
+const REQUEST_OBJECTS: ReadonlySet<string> = new Set(["body", "reqbody", "requestbody"]);
+// `*` and `-` are numeric-only; `+` is excluded because it also builds display strings
+// (`"You added " + body.quantity + " items"`), which is not price arithmetic.
+const ARITHMETIC = new Set(["*", "-"]);
 const COMPARISON = new Set(["<", "<=", ">", ">="]);
 const COMMERCE_CONTEXT =
   /checkout|\bcart\b|\border\b|\bprice\b|\btotal\b|payment|\bpay\b|charge|invoice/i;
@@ -66,10 +63,20 @@ function hasValidation(scope: SyntaxNode, alias: string | null): boolean {
     if (validated) return false;
     if (node.type === "call_expression") {
       const name = calleeName(node).toLowerCase();
-      // Number.isInteger / Number.isFinite, or a zod-style schema `.safeParse` — NOT JSON.parse.
+      // Number.isInteger / Number.isFinite, or a schema `.safeParse`.
       if (name === "isinteger" || name === "isfinite" || name === "safeparse") {
         validated = true;
         return false;
+      }
+      // A throwing schema `.parse(...)` counts too (the dominant zod idiom) — but NOT `JSON.parse`.
+      if (name === "parse") {
+        const fn = node.childForFieldName("function");
+        const obj =
+          fn?.type === "member_expression" ? (fn.childForFieldName("object")?.text ?? "") : "";
+        if (obj !== "JSON") {
+          validated = true;
+          return false;
+        }
       }
     }
     if (node.type === "binary_expression") {

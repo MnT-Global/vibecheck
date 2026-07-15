@@ -43,7 +43,10 @@ Built by MnT · https://mntfuture.com`;
 
 function flagValue(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
+  if (i < 0) return undefined;
+  const v = args[i + 1];
+  // A flag's value is the next token only if it isn't itself another flag (a missing value).
+  return v && !v.startsWith("--") ? v : undefined;
 }
 
 /** Did the user pass a remote repo URL (or a `./`-prefixed one) instead of a local folder? */
@@ -68,6 +71,15 @@ async function main(): Promise<void> {
   if (!target) {
     console.error("error: no scan path given\n");
     console.log(USAGE);
+    process.exit(1);
+  }
+
+  // A CI gate that silently passes on a typo'd or missing threshold is worse than no gate at all.
+  // If --min-grade was given, it MUST resolve to a real grade — otherwise fail closed, loudly.
+  if (args.includes("--min-grade") && (!minGrade || GRADE_RANK.indexOf(minGrade as Grade) < 0)) {
+    console.error(
+      `error: --min-grade needs a valid grade value (one of: ${GRADE_RANK.join(", ")})`,
+    );
     process.exit(1);
   }
 

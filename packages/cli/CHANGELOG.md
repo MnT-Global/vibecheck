@@ -1,5 +1,48 @@
 # @mntglobal/vibecheck
 
+## 0.1.3
+
+### Patch Changes
+
+- Trust milestone — the grade and the gate now tell the truth, and the loud false positives are quiet.
+
+  This closes the top findings from vibecheck's own self-audit.
+
+  **Scoring & CI (were: promise-defeating).**
+
+  - A **severity floor** caps the grade by the worst finding: any `critical` now grades at most **D**, any
+    `high` at most **B**. A hardcoded live secret used to grade "B" (the per-category cap clamped it) —
+    it now grades D, and the CI gate catches it.
+  - The `--ci --min-grade` gate now **fails closed**: an unknown or missing threshold (a typo like
+    lowercase `b`, or a swallowed value) errors and exits non-zero instead of silently passing everything.
+
+  **Secrets in `.json` / `.env` are now scanned (were: invisible).** JSON and env files have no grammar,
+  so the AST-based secret scanners skipped them — a Stripe key or a `-----BEGIN PRIVATE KEY-----` in
+  `config.json`, a service-account file, or a committed `.env` went undetected. SEC-01 and SEC-04 now
+  also scan those as raw text (lockfiles excluded).
+
+  **False positives quieted.**
+
+  - SEC-04 no longer flags local-dev DB URLs (`postgres:postgres@localhost`, docker-compose defaults).
+  - COM-02 no longer fires on string concatenation (`"You added " + body.quantity`) or on a quantity
+    validated by a throwing schema `.parse()`.
+  - AUTH-03 no longer flags auth scheme / provider constants (`token_type === "bearer"`).
+  - SEC-02 no longer flags keys that are public by design (Firebase, Google Maps, reCAPTCHA, Algolia).
+  - WEB-01 no longer penalizes the correct `const clean = DOMPurify.sanitize(x)` pattern.
+  - SEC-03 skips test/fixture credential files and framework convention env files (`.env.development`,
+    `.env.test`, …); `detectClient` recognizes Vite/CRA/Remix client directories.
+
+  **False negatives closed.**
+
+  - AUTH-03 now flags a credential assigned straight to a variable (`const ADMIN_PASSWORD = "…"`).
+  - INJ-01 now flags `Function()` without `new` and string-body `setTimeout`/`setInterval`.
+
+  Adds 17 precision-gate tests. Anchor fixtures unchanged (lab-before F, lab-after A, self-scan A+).
+  (Standalone `.pem`/`.key` credential _files_ and the engine-robustness hardening are tracked for v0.1.4.)
+
+- Updated dependencies
+  - @mntglobal/vibecheck-core@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes

@@ -67,6 +67,16 @@ export function score(
     });
   }
 
-  const pct = Math.max(0, 100 - totalDeduction);
+  const points = Math.max(0, 100 - totalDeduction);
+
+  // Severity floor. The per-category cap can let a serious finding score deceptively well — a single
+  // hardcoded secret is one critical in `secrets`, capped at −20 → 80/"B". A security grade must
+  // never read "B" when a critical is present, nor "A−" for a lone high in a low-weight category.
+  // Cap the attainable score by the worst severity seen, so the grade can never overstate safety
+  // regardless of which category the finding happens to live in.
+  const severities = new Set(findings.map((f) => f.severity));
+  const floor = severities.has("critical") ? 50 : severities.has("high") ? 82 : 100;
+  const pct = Math.min(points, floor);
+
   return { score: pct, grade: gradeFor(pct), categoryScores };
 }

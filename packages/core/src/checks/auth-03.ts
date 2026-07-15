@@ -11,17 +11,36 @@ const SECRET_NAME =
 /** Defaults that are clearly placeholders, not real credentials — not worth flagging. */
 const PLACEHOLDER_DEFAULT =
   /test|dev\b|local|example|placeholder|changeme|from[-_]?env|your[-_]|dummy|xxx|sample|todo|^<.*>$/i;
+/** Auth *scheme* / *type* / provider-id words — comparing to these isn't a hardcoded credential. */
+const PROTOCOL_CONSTANT =
+  /^(?:bearer|basic|digest|negotiate|oauth2?|openid|saml|jwt|apikey|api[-_]?key|none|null|credentials?|password|email|username|user|admin|google|github|gitlab|bitbucket|facebook|twitter|apple|microsoft|azure|okta|auth0|cognito|discord|slack|linkedin|local|ldap|token|access|refresh|id[-_]?token|access[-_]?token|refresh[-_]?token)$/i;
 const EQUALITY = new Set(["===", "!==", "=="]);
 
 function isWeakDefault(literal: string, minLen: number): boolean {
+  if (PROTOCOL_CONSTANT.test(literal.trim())) return false;
   return literal.length >= minLen && !PLACEHOLDER_DEFAULT.test(literal);
 }
 
-/** The name of an identifier or the property of a member expression. */
+/** Provider-formatted secrets (Stripe, AWS, GitHub, …) are SEC-01/04's job — don't double-report. */
+const PROVIDER_SHAPE =
+  /^(?:sk_|pk_|rk_|whsec_|AKIA|ASIA|ghp_|gho_|ghs_|github_pat_|xox[baprs]-|AIza|SG\.|ya29\.|glpat-|-----BEGIN)/;
+
+/** Does a literal look like an actual secret value (not a role / scheme / dictionary word)? */
+function looksLikeCredentialValue(v: string): boolean {
+  if (v.length < 8 || PROTOCOL_CONSTANT.test(v.trim()) || PLACEHOLDER_DEFAULT.test(v)) return false;
+  if (PROVIDER_SHAPE.test(v)) return false; // owned by SEC-01/SEC-04, avoid a duplicate finding
+  const hasDigit = /\d/.test(v);
+  const hasSpecial = /[^A-Za-z0-9]/.test(v);
+  const mixedCase = /[a-z]/.test(v) && /[A-Z]/.test(v);
+  return hasDigit || hasSpecial || mixedCase;
+}
+
+/** The name of an identifier, member property, or object key. */
 function nameOf(node: SyntaxNode | null): string {
   if (!node) return "";
-  if (node.type === "identifier") return node.text;
+  if (node.type === "identifier" || node.type === "property_identifier") return node.text;
   if (node.type === "member_expression") return node.childForFieldName("property")?.text ?? "";
+  if (node.type === "string") return node.text.replace(/^["'`]|["'`]$/g, "");
   return "";
 }
 
@@ -69,6 +88,35 @@ export const auth03: Check = {
     for (const file of ctx.files) {
       if (!file.tree || isTestOrExampleFile(file.path)) continue;
       walk(file.tree.rootNode, (node) => {
+        // Case 3: a credential assigned straight to a variable / property —
+        // `const ADMIN_PASSWORD = "SuperSecret123!"` / `{ apiKey: "prod-7f3a9c2b1e8d" }`.
+        if (
+          node.type === "variable_declarator" ||
+          node.type === "assignment_expression" ||
+          node.type === "pair"
+        ) {
+          const nameNode =
+            node.childForFieldName("name") ??
+            node.childForFieldName("left") ??
+            node.childForFieldName("key");
+          const valNode = node.childForFieldName("value") ?? node.childForFieldName("right");
+          if (
+            valNode?.type === "string" &&
+            SECRET_NAME.test(nameOf(nameNode)) &&
+            looksLikeCredentialValue(stringLiteralValue(valNode))
+          ) {
+            push(
+              file.path,
+              node,
+              file.text,
+              "high",
+              "Hardcoded credential assigned in source",
+              "Load the credential from a secret manager / environment variable; never hardcode it.",
+            );
+          }
+          return;
+        }
+
         if (node.type !== "binary_expression") return;
         const op = node.childForFieldName("operator")?.text ?? "";
         const left = node.childForFieldName("left");

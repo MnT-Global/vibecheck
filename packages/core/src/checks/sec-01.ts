@@ -1,7 +1,7 @@
 import { redactedEvidence, stringLiteralValue } from "../loader/redact.js";
 import { findNodes } from "../parse/index.js";
 import type { Check, Finding, ScanContext, Severity } from "../types.js";
-import { isPlaceholderSecret, isTestOrExampleFile, lineAt } from "./shared.js";
+import { isLockfile, isPlaceholderSecret, isTestOrExampleFile, lineAt } from "./shared.js";
 
 interface Pattern {
   name: string;
@@ -70,34 +70,65 @@ export const sec01: Check = {
     const findings: Finding[] = [];
     const seen = new Set<string>();
 
+    const record = (
+      file: string,
+      line: number,
+      column: number,
+      hit: { pattern: Pattern; secret: string },
+      evidenceLine: string,
+    ) => {
+      const key = `${file}:${line}:${hit.pattern.name}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      findings.push({
+        id: "SEC-01",
+        category: "secrets",
+        severity: hit.pattern.severity,
+        confidence: "high",
+        title: `Hardcoded ${hit.pattern.name}`,
+        file,
+        line,
+        column,
+        evidence: redactedEvidence(evidenceLine, hit.secret),
+        fix: "Move this secret to an environment variable and rotate the exposed key immediately.",
+        docsUrl: "https://github.com/MnT-Global/vibecheck/blob/main/docs/rules.md#sec-01",
+      });
+    };
+
     for (const file of ctx.files) {
-      if (!file.tree || isTestOrExampleFile(file.path)) continue;
+      if (isTestOrExampleFile(file.path)) continue;
 
-      for (const node of findNodes(file.tree.rootNode, STRING_NODES)) {
-        const value = stringLiteralValue(node);
-        if (value.length < 8 || isPlaceholderSecret(value)) continue;
+      if (file.tree) {
+        for (const node of findNodes(file.tree.rootNode, STRING_NODES)) {
+          const value = stringLiteralValue(node);
+          if (value.length < 8 || isPlaceholderSecret(value)) continue;
+          const hit = match(value);
+          if (!hit) continue;
+          record(
+            file.path,
+            node.startPosition.row + 1,
+            node.startPosition.column,
+            hit,
+            lineAt(file.text, node.startPosition.row),
+          );
+        }
+        continue;
+      }
 
-        const hit = match(value);
-        if (!hit) continue;
-
-        const line = node.startPosition.row + 1;
-        const key = `${file.path}:${line}:${hit.pattern.name}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        findings.push({
-          id: "SEC-01",
-          category: "secrets",
-          severity: hit.pattern.severity,
-          confidence: "high",
-          title: `Hardcoded ${hit.pattern.name}`,
-          file: file.path,
-          line,
-          column: node.startPosition.column,
-          evidence: redactedEvidence(lineAt(file.text, node.startPosition.row), hit.secret),
-          fix: "Move this secret to an environment variable and rotate the exposed key immediately.",
-          docsUrl: "https://github.com/MnT-Global/vibecheck/blob/main/docs/rules.md#sec-01",
-        });
+      // No grammar (.json / .env): the AST path can't see these, but real secrets hide in
+      // config.json, service-account JSON and committed .env — scan the raw text line by line.
+      if (isLockfile(file.path)) continue;
+      const lines = file.text.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const hit = match(lines[i] ?? "");
+        if (!hit || hit.secret.length < 8 || isPlaceholderSecret(hit.secret)) continue;
+        record(
+          file.path,
+          i + 1,
+          Math.max(0, (lines[i] ?? "").indexOf(hit.secret)),
+          hit,
+          lines[i] ?? "",
+        );
       }
     }
     return findings;

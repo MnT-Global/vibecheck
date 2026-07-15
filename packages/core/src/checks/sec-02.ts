@@ -8,8 +8,10 @@ const DOCS = "https://github.com/MnT-Global/vibecheck/blob/main/docs/rules.md#se
 /** Env prefixes that are compiled into the client bundle. */
 const PUBLIC_PREFIX =
   /^(?:NEXT_PUBLIC_|VITE_|REACT_APP_|PUBLIC_|EXPO_PUBLIC_|GATSBY_|NUXT_PUBLIC_)/;
-/** Name fragments that mean "this is a secret". */
-const SECRET_SUFFIX = /(?:SECRET|PRIVATE|_KEY|TOKEN|PASSWORD|API_?KEY|CREDENTIAL)/i;
+/** Name fragments that unambiguously mean "this is a secret". A bare `_KEY`/`API_KEY` is NOT here:
+ * Firebase, Google Maps, reCAPTCHA site, and Algolia search keys all end in `_KEY` and are public by
+ * design, so requiring a strong token (SECRET/PRIVATE/PASSWORD/TOKEN/…) avoids that whole FP class. */
+const SECRET_SUFFIX = /(?:SECRET|PRIVATE|PASSWORD|PASSWD|TOKEN|CREDENTIAL|SERVICE_?ROLE)/i;
 /** Keys that are meant to be public (Stripe publishable, etc.) — not a leak. */
 const PUBLISHABLE = /(?:PUBLISHABLE|PUBLIC_KEY|PUBKEY)/i;
 const ENV_OBJECT = /(?:process\.env|import\.meta\.env)/;

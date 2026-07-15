@@ -1,10 +1,14 @@
 import { basename } from "node:path";
 import type { Check, Finding, ScanContext } from "../types.js";
+import { isTestOrExampleFile } from "./shared.js";
 
 const DOCS = "https://github.com/MnT-Global/vibecheck/blob/main/docs/rules.md#sec-03";
 
-/** Conventional, safe-to-commit env templates. */
-const ENV_TEMPLATE = /\.(example|sample|template|dist|defaults)$/i;
+/** Conventional, safe-to-commit env files: templates + the framework tier files that hold
+ * non-secret defaults (`.env.development`, `.env.production`, `.env.test`, …). Real secrets inside
+ * any of these are still caught by SEC-01/SEC-04's content scan; SEC-03 only flags a bare `.env`. */
+const ENV_TEMPLATE =
+  /\.(example|sample|template|dist|defaults|local|development|dev|production|prod|test|testing|ci|staging|stage)$/i;
 
 /** Credential files that must never be committed. */
 const CREDENTIAL_FILE =
@@ -28,6 +32,7 @@ export const sec03: Check = {
     const findings: Finding[] = [];
 
     for (const file of ctx.files) {
+      if (isTestOrExampleFile(file.path)) continue;
       const base = basename(file.path);
       const isEnv = file.lang === "env" && !ENV_TEMPLATE.test(base);
       const isCred = CREDENTIAL_FILE.test(base);

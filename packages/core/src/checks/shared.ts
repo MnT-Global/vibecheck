@@ -6,6 +6,13 @@ export function isTestOrExampleFile(path: string): boolean {
   return TEST_OR_EXAMPLE.test(path);
 }
 
+/** Generated dependency lockfiles — huge, hash-dense, and never a place secrets live. */
+export function isLockfile(path: string): boolean {
+  return /(?:^|\/)(?:package-lock|npm-shrinkwrap)\.json$|(?:^|\/)(?:pnpm-lock\.yaml|yarn\.lock)$/.test(
+    path,
+  );
+}
+
 /** Obvious dummy/placeholder values that are not real secrets. */
 const PLACEHOLDER =
   /^(?:x+|\.+|your[-_ ].*|my[-_ ].*|changeme|example|dummy|test|placeholder|todo|xxx+|<[^>]*>|\$\{[^}]*\}|(.)\1{5,})$/i;

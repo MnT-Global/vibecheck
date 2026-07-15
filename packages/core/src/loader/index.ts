@@ -60,7 +60,9 @@ function detectClient(relPath: string, text: string): boolean {
   if (/^["']use client["']/m.test(text)) return true;
   const p = relPath.split(sep).join("/");
   if (/\/api\//.test(p) || /(^|\/)(app\/api|lib\/server|server)\//.test(p)) return false;
-  if (/(^|\/)(components|src\/components)\//.test(p)) return true;
+  // Common client directories across Next / Vite / CRA / Remix layouts (not just Next's components/).
+  if (/(^|\/)(?:src\/)?(?:components|features|views|ui|widgets|screens|containers)\//.test(p))
+    return true;
   if (/(^|\/)pages\//.test(p) && !/(^|\/)pages\/api\//.test(p)) return true;
   return false;
 }
