@@ -25,10 +25,10 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build # build first: the CLI's typecheck/tests import the core's built types
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm build
 
       # Publishes @mntglobal/vibecheck-core then @mntglobal/vibecheck (workspace:* → real versions).
       - name: Publish to npm
