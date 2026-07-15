@@ -1,0 +1,29 @@
+{
+  "name": "@mntglobal/vibecheck-core",
+  "version": "0.0.0",
+  "description": "vibecheck engine — deterministic checks over a ScanContext. Built by MnT.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "wasm"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "record-fixture": "node src/loader/record-fixture.ts"
+  },
+  "dependencies": {
+    "ignore": "^6.0.2",
+    "tree-sitter-wasms": "^0.1.12",
+    "web-tree-sitter": "^0.24.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5"
+  }
+}
